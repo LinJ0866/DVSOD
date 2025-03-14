@@ -62,40 +62,63 @@ def colorEnhance(imgs):
 
 
 class SalObjDataset(data.Dataset):
-    def __init__(self, data_root, subset, augmentation, interval, sample_rate, trainsize, baseMode):
+    def __init__(self, data_root, dataset, subset, augmentation, interval, sample_rate, trainsize, baseMode):
 
-        with open(os.path.join(data_root, subset + '.txt')) as f:
-            lines = f.readlines()
-            videolists = sorted([line.strip() for line in lines])
+        if dataset == 'rdvs':
+            lable_rgb = 'rgb'
+            lable_depth = 'Depth'
+            lable_gt = 'ground-truth'
+
+            if subset == 'train':
+                data_dir = os.path.join(data_root, 'RDVS/train')
+            else:
+                data_dir = os.path.join(data_root, 'RDVS/test')
+        elif dataset == 'vidsod_100':
+            lable_rgb = 'rgb'
+            lable_depth = 'depth'
+            lable_gt = 'gt'
+            
+            if subset == 'train':
+                data_dir = os.path.join(data_root, 'vidsod_100/train')
+                data_dir = '/home/linj/workspace/vsod/datasets/vidsod_100/train'
+            else:
+                data_dir = os.path.join(data_root, 'vidsod_100/test')
+        elif dataset == 'dvisal':
+            lable_rgb = 'RGB'
+            lable_depth = 'Depth'
+            lable_gt = 'GT'
+
+            data_dir = os.path.join(data_root, 'DViSal_dataset/data')
+
+            if subset == 'train':
+                dvi_mode = 'train'
+            else:
+                dvi_mode = 'test_all'
+        else:
+            raise 'dataset is not support now.'
+        
+        if dataset == 'dvisal':
+            with open(os.path.join(data_dir, '../', dvi_mode+'.txt'), mode='r') as f:
+                videolists = set(f.read().splitlines())
+        else:
+            videolists = os.listdir(data_dir)
 
         self.filenames_gt = []
         self.filenames = []
         self.filenames_dep = []
 
         for video in videolists:
-            # Create List for only labeled GT
-            label_path = os.path.join(data_root, 'data', video, 'GT')
-            filenames_gt_i = [os.path.join(label_path, f) for f in os.listdir(label_path)
-                              if any(f.endswith(ext) for ext in ['.jpg', '.png'])]
-            self.filenames_gt += sorted(filenames_gt_i)
-
-            # Create List for only labeled Image seqs
-            image_path = os.path.join(data_root, 'data', video, 'RGB')
-            file_postfix = os.listdir(image_path)[-1][-4:]
-            filenames_i = [os.path.join(image_path, f[:-4] + file_postfix) for f in os.listdir(label_path)
-                           if any(f.endswith(ext) for ext in ['.jpg', '.png'])]
-            self.filenames += sorted(filenames_i)
-
-            # Create List for only labeled depth seqs
-            depth_path = os.path.join(data_root, 'data', video, 'Depth')
-            file_dep_postfix = os.listdir(depth_path)[-1][-4:]
-            filenames_dep_i = [os.path.join(depth_path, f[:-4] + file_dep_postfix) for f in os.listdir(label_path)
-                              if any(f.endswith(ext) for ext in ['.jpg', '.png'])]
-            self.filenames_dep += sorted(filenames_dep_i)
-
-        self.filenames_gt.sort()
-        self.filenames.sort()
-        self.filenames_dep.sort()
+            video_path = os.path.join(data_dir, video)
+            rgb_path = os.path.join(video_path, lable_rgb)
+            depth_path = os.path.join(video_path, lable_depth)
+            gt_path = os.path.join(video_path, lable_gt)
+            frames = os.listdir(rgb_path)
+            frames = sorted(frames)
+            for frame in frames[:-1]:
+                self.filenames_gt.append(os.path.join(gt_path, frame.replace('jpg', 'png')))
+                self.filenames.append(os.path.join(rgb_path, frame))
+                self.filenames_dep.append(os.path.join(depth_path, frame.replace('jpg', 'png')))
+        
         self.size = len(self.filenames)
 
 
@@ -238,11 +261,11 @@ class SalObjDataset(data.Dataset):
         return base_file_path, file_name
 
 
-def get_loader(data_root, batchsize, trainsize,
+def get_loader(data_root, dataset, batchsize, trainsize,
                subset, augmentation, interval, sample_rate,
                shuffle=True, num_workers=12, pin_memory=True, baseMode=False):
 
-    dataset = SalObjDataset(data_root, subset, augmentation, interval, sample_rate, trainsize, baseMode)
+    dataset = SalObjDataset(data_root, dataset, subset, augmentation, interval, sample_rate, trainsize, baseMode)
     data_loader = data.DataLoader(dataset=dataset,
                                   batch_size=batchsize,
                                   shuffle=shuffle,

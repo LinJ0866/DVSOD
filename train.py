@@ -18,11 +18,11 @@ cudnn.benchmark = True
 Train_setup = [0, False, False]    # the DVSOD baseline
 
 videos_ROOT = 'Your_DViSal_dataset_path/'
-ckpt_path = 'Your_ckpt_save_path/'
+# ckpt_path = 'Your_ckpt_save_path/'
 val_setName= 'val'
 
-writer = SummaryWriter()
 parser = argparse.ArgumentParser()
+parser.add_argument('--dataset', type=str, choices=['rdvs', 'vidsod_100', 'dvisal'])
 parser.add_argument('--is_ResNet', type=bool,   default=True,   help='VGG or ResNet backbone')
 parser.add_argument('--snapshot',  type=int,    default=Train_setup[0], help='load checkpoint number')
 parser.add_argument('--ckpt_load', type=bool,   default=Train_setup[1], help='whether load checkpoint or not')
@@ -41,17 +41,19 @@ parser.add_argument('--decay_epoch', type=int,  default=150,    help='every n ep
 opt = parser.parse_args()
 print('Learning Rate: {} ResNet: {}'.format(opt.lr, opt.is_ResNet))
 
+ckpt_path = os.path.join('runs', opt.dataset)
+writer = SummaryWriter(logdir=ckpt_path)
 if opt.win_size == -1:
     opt.win_size = opt.stm_queue_size + 1
 interval = [opt.win_size - 1, 0]
 assert(len(interval) == 2 and interval[0] >= 0 and interval[1] >= 0)
 
-train_loader = get_loader(videos_ROOT, batchsize=opt.batchsize, trainsize=opt.trainsize,
+train_loader = get_loader(videos_ROOT, opt.dataset, batchsize=opt.batchsize, trainsize=opt.trainsize,
                           subset='train', augmentation=True, interval=interval, sample_rate=opt.sample_rate,
                           baseMode=opt.baseline_mode)
-val_loader = get_loader(videos_ROOT, batchsize=1, trainsize=opt.trainsize, shuffle=False, pin_memory=False,
-                          subset=val_setName, augmentation=False, interval=interval, sample_rate=opt.sample_rate,
-                          baseMode=opt.baseline_mode)
+# val_loader = get_loader(videos_ROOT, batchsize=1, trainsize=opt.trainsize, shuffle=False, pin_memory=False,
+#                           subset=val_setName, augmentation=False, interval=interval, sample_rate=opt.sample_rate,
+#                           baseMode=opt.baseline_mode)
 
 # build models
 model = RGBDVSODModel(opt, isTrain=True, is_ResNet=opt.is_ResNet)
@@ -126,8 +128,8 @@ print("Let's go!")
 for epoch in range(1, opt.epoch):
     adjust_lr(optimizer, opt.lr, epoch, opt.decay_rate, opt.decay_epoch)
     train(opt, train_loader, model, optimizer, epoch)
-    if (epoch+1) % opt.save_interval == 0:
-        ckpt_name = str(epoch+1)
-        eval_data(opt, val_loader, ckpt_name, is_ResNet=opt.is_ResNet, ckpt_path=ckpt_path)
+    # if (epoch+1) % opt.save_interval == 0:
+    #     ckpt_name = str(epoch+1)
+    #     eval_data(opt, val_loader, ckpt_name, is_ResNet=opt.is_ResNet, ckpt_path=ckpt_path)
     if epoch >= opt.epoch -1:
         writer.close()
